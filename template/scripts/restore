@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Keep this path for calling _common.sh inside the execution's context of backup and restore scripts
+source ../settings/scripts/_common.sh
+source /usr/share/yunohost/helpers
+
+synapse_install_dir=$(ynh_app_setting_get --app $synapse_instance --key install_dir)
+synapse_db_name="$(get_synapse_db_name $synapse_instance)"
+bot_synapse_db_user="@$botname:$server_name"
+
+#=================================================
+# RESTORE THE APP MAIN DIR
+#=================================================
+ynh_script_progression "Restoring the app main directory..."
+
+ynh_restore "$install_dir"
+
+#=================================================
+# SPECIFIC RESTORATION
+#=================================================
+# RESTORE THE POSTGRESQL DATABASE
+#=================================================
+ynh_script_progression "Restoring the PostgreSQL database..."
+
+ynh_psql_db_shell < "./db.sql"
+
+#=================================================
+# REGISTER SYNAPSE APP-SERVICE
+#=================================================
+ynh_script_progression "Registering Synapse app-service"
+
+chmod u+x "$install_dir/@@BINARY@@" # Execute permissions for app user
+$install_dir/@@BINARY@@ -g -c $install_dir/config.yaml -r /etc/matrix-$synapse_instance/app-service/$app.yaml
+# We need to run @@BINARY@@ -g (registration) as root to be able to write in /etc/matrix-...
+secure_install_dir
+
+$synapse_install_dir/update_synapse_for_appservice.sh || ynh_die "Synapse can't restart with the appservice configuration"
+
+#=================================================
+# RESTORE SYSTEMD
+#=================================================
+ynh_script_progression "Restoring $app's systemd service..."
+
+ynh_restore "/etc/systemd/system/$app.service"
+systemctl enable $app.service --quiet
+
+#=================================================
+# RESTORE THE LOGROTATE CONFIGURATION
+#=================================================
+ynh_script_progression "Restoring the logrotate configuration..."
+
+ynh_restore "/etc/logrotate.d/$app"
+mkdir --parents "/var/log/$app"
+# The bridge runs as $app: give it back its log directory (mkdir creates it as root)
+chown -R "$app:$app" "/var/log/$app"
+chmod 750 "/var/log/$app"
+
+#=================================================
+# INTEGRATE SERVICE IN YUNOHOST
+#=================================================
+ynh_script_progression "Integrating service in YunoHost..."
+
+yunohost service add $app --description="$app daemon for bridging @@DISPLAY@@ and Matrix messages" --log="/var/log/$app/$app.log"
+
+#=================================================
+# START SYSTEMD SERVICE
+#=================================================
+ynh_script_progression "Starting $app's systemd service..."
+
+# Start a systemd service
+ynh_systemctl --service="$app" --action="start"
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+
+ynh_script_progression "Restoration completed for $app"

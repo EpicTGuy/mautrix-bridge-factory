@@ -1,0 +1,187 @@
+#:schema https://raw.githubusercontent.com/YunoHost/apps/master/schemas/config_panel.v1.schema.json
+
+version = "1.0"
+
+[main]
+name = "Main Settings"
+services = ["__APP__"]
+
+    [main.permissions]
+    name = "Permissions for using the bridge"
+
+        [main.permissions.helptext]
+        ask = '''
+        Roles with Increasing Power: Relay<User<Admin
+        Allowed values for roles:
+        - * : All Matrix users
+        - domain.tld : All users on a given homeserver
+        - mxid (@user:matrix.org) : Specific Matrix user
+        '''
+        type = "markdown"
+
+        [main.permissions.listrelay]
+        ask = "Users bridged thanks to Relay Mode"
+        type = "tags"
+        help = "Relay Role: Talk on @@DISPLAY@@ through the RelayBot in a room where it has been activated with '@@CMD@@ set-relay', no access otherwise."
+        visible = "enable_relaybot"
+
+        [main.permissions.listuser]
+        ask = "Bridge Users"
+        type = "tags"
+        help = "User Role: Access to use the bridge to chat with a @@DISPLAY@@ account."
+
+        [main.permissions.listadmin]
+        ask = "Bridge Administrators"
+        type = "tags"
+        help = "Admin Role: User level and some additional administration tools."
+
+    [main.bridge]
+    name = "Puppetting Bridge Settings"
+
+        [main.bridge.enable_relaybot]
+        ask = "Should Relay Mode be allowed?"
+        type = "boolean"
+        yes = "true"
+        no = "false"
+        help = "If allowed, '@@CMD@@ set-relay' can be used to turn any Bridge User into a RelayBot for that chat. This allows people to talk on @@DISPLAY@@ without an own account."
+        bind = "relay>enabled:__INSTALL_DIR__/config.yaml"
+
+        [main.bridge.admin_only]
+        ask = "Should only Bridge Admins be allowed to set themselves as Relay Users?"
+        type = "boolean"
+        yes = "true"
+        no = "false"
+        help = "See User management -> Admins"
+        bind = ":__INSTALL_DIR__/config.yaml"
+        visible = "enable_relaybot"
+
+@@if backfill@@
+        [main.bridge.thread_backfill_batch_count]
+        ask = "Import all older @@SHORT@@ chats?"
+        type = "boolean"
+        yes = "-1"
+        no = "0"
+        help = "If enabled, every @@SHORT@@ chat is imported at the next bridge start, one page every 2 seconds. If disabled, only the chats that receive new messages appear."
+
+@@endif@@
+@@if ghost@@
+        [main.bridge.ghost_displayname_template]
+        ask = "Display name of @@SHORT@@ contacts in Matrix"
+        type = "string"
+        help = "@@GHOST_HELP@@"
+
+@@endif@@
+        [main.bridge.backfill_max_initial_messages]
+        ask = "How many past messages to import in a new chat?"
+        type = "number"
+        min = 0
+        help = "Applies to chats bridged from now on. 0 disables the import of past messages."
+
+    [main.bot]
+    name = "Robot Settings"
+
+        [main.bot.botname]
+        ask = "Username of the AppService Bot"
+        type = "string"
+        help = "Sets bot username. Please keep in mind that the bot admin room for previous bot username will stop working so you may need to create a new one using the new username"
+        bind = "bot>username:__INSTALL_DIR__/config.yaml"
+        pattern.regexp = "^[a-z0-9._=-]+$"
+        pattern.error = "Lowercase letters, digits and . _ = - only"
+
+        [main.bot.displayname]
+        ask = "Display name for Bot"
+        type = "string"
+        help = "Set to 'remove' to remove display name, leave empty to set default '@@SHORT@@ bridge bot'"
+
+        [main.bot.avatar]
+        ask = "Avatar for Bot"
+        type = "string"
+        help = "Should be in format 'mxc://server_name/NeXNQarUbrlYBiPCpprYsRqr', see README for tutorial. Set to 'remove' to remove avatar, leave empty to use standard @@DISPLAY@@ logo."
+
+[privacy]
+name = "Privacy"
+services = ["__APP__"]
+
+    [privacy.portal_rooms]
+    name = "Portal Rooms & Encryption Settings"
+
+        [privacy.portal_rooms.text]
+        ask = '''
+        !! Inviting the Bridge in an encrypted room          !!
+        !! breaks real End-to-End Encryption (e2ee)          !!
+        !! Messages will be unencrypted on the Bridge Server !!
+        '''
+        type = "markdown"
+
+        [privacy.portal_rooms.encryption]
+        ask = "Allow Encryption between Matrix Client and Bridge Server?"
+        type = "boolean"
+        yes = "true"
+        no = "false"
+        help = "Enable so-called End-to-Bridge (e2b) Encryption. For the Bridge to work in group chat Rooms with End-to-End Encryption (e2ee) enabled."
+        bind = "encryption>allow:__INSTALL_DIR__/config.yaml"
+
+        [privacy.portal_rooms.encryption_default]
+        ask = "Force-enable Encryption in all Portal Rooms the Bridge creates?"
+        type = "boolean"
+        yes = "true"
+        no = "false"
+        help = "This will cause the Bridge Bot to be in private chats for the Encryption to work properly."
+        bind = "encryption>default:__INSTALL_DIR__/config.yaml"
+        visible = "encryption"
+
+        [privacy.portal_rooms.encryption_require]
+        ask = "Require encryption?"
+        type = "boolean"
+        yes = "true"
+        no = "false"
+        help = "Require encryption, drop any unencrypted messages."
+        bind = "encryption>require:__INSTALL_DIR__/config.yaml"
+        visible = "encryption"
+
+    [privacy.config]
+    name = "Privacy Settings"
+
+        [privacy.config.delivery_receipts]
+        ask = "Enable Delivery Receipts?"
+        type = "boolean"
+        yes = "true"
+        no = "false"
+        help = "Should the bridge send a read Receipt from the bridge bot when a message has been sent to @@DISPLAY@@?"
+        bind = ":__INSTALL_DIR__/config.yaml"
+
+
+[advanced]
+name = "Advanced Settings"
+services = ["__APP__"]
+
+    [advanced.helptext]
+    name = "SETTINGS FOR EXPERTS IN SERVER ADMINISTRATION"
+    help = "There are security and privacy risks if you change these settings without knowing what you do!"
+
+@@NETOPTS_PANEL@@
+    [advanced.appservice]
+    name = "HomeServer Application Service"
+
+        [advanced.appservice.async_media]
+        ask = "Enable asynchronous media uploads?"
+        type = "boolean"
+        yes = "true"
+        no = "false"
+        help = "Enable only if HomeServer supports https://github.com/matrix-org/matrix-spec-proposals/pull/2246"
+        bind = ":__INSTALL_DIR__/config.yaml"
+
+        [advanced.appservice.ephemeral_events]
+        ask = "Receive Ephemeral Events via AppService transactions?"
+        type = "boolean"
+        yes = "true"
+        no = "false"
+        help = "Enable only if HomeServer supports MSC2409 (i.e. Synapse 1.22+). If enabled, you should disable bridge -> 'sync_with_custom_puppets'."
+        bind = ":__INSTALL_DIR__/config.yaml"
+
+        [advanced.appservice.min_level]
+        ask = "Logging print level for Standard Output"
+        type = "select"
+        choices = ["debug", "info", "warn", "error", "fatal"]
+        help = "Minimum severity for log messages printed to stdout/stderr. This doesn't affect the log file."
+        bind = ":__INSTALL_DIR__/config.yaml"

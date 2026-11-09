@@ -1,0 +1,252 @@
+#!/bin/bash
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# INITIALIZE AND STORE SETTINGS
+#=================================================
+# Retrieve some values from selected Synapse instance and store them
+synapse_install_dir=$(ynh_app_setting_get --app $synapse_instance --key install_dir)
+
+bot_synapse_db_user="@$botname:$server_name"
+
+#=================================================
+# GET CONFIG PANEL SETTINGS
+#=================================================
+personal_filtering_spaces=$(ynh_app_setting_get --key=personal_filtering_spaces)
+enable_relaybot=$(ynh_app_setting_get --key=enable_relaybot)
+admin_only=$(ynh_app_setting_get --key=admin_only)
+displayname=$(ynh_app_setting_get --key=displayname)
+listrelay=$(ynh_app_setting_get --key=listrelay)
+listuser=$(ynh_app_setting_get --key=listuser)
+listadmin=$(ynh_app_setting_get --key=listadmin)
+
+async_media=$(ynh_app_setting_get --key=async_media)
+
+avatar=$(ynh_app_setting_get --key=avatar)
+ephemeral_events=$(ynh_app_setting_get --key=ephemeral_events)
+username_template=$(ynh_app_setting_get --key=username_template)
+
+delivery_receipts=$(ynh_app_setting_get --key=delivery_receipts)
+
+encryption=$(ynh_app_setting_get --key=encryption)
+encryption_default=$(ynh_app_setting_get --key=encryption_default)
+encryption_require=$(ynh_app_setting_get --key=encryption_require)
+pickle_key=$(ynh_app_setting_get --key=pickle_key)
+
+print_level=$(ynh_app_setting_get --key=print_level)
+# The config panel stores its choice as "min_level" (name of the key in config.yaml)
+min_level=$(ynh_app_setting_get --key=min_level)
+[ -z "$min_level" ] || print_level=$min_level
+@@if backfill@@
+thread_backfill_batch_count=$(ynh_app_setting_get --key=thread_backfill_batch_count)
+@@endif@@
+
+ynh_script_progression "Checking version..."
+
+#=================================================
+# STOP SYSTEMD SERVICE
+#=================================================
+ynh_script_progression "Stopping $app's systemd service..."
+
+ynh_systemctl --service="$app" --action="stop"
+
+#=================================================
+# ENSURE DOWNWARD COMPATIBILITY
+#=================================================
+ynh_script_progression "Ensuring downward compatibility..."
+
+# SET STANDARD SETTINGS FROM DEFAULT CONFIG
+
+if [ -z "$personal_filtering_spaces" ]
+then
+  personal_filtering_spaces="false"
+  ynh_app_setting_set --key=personal_filtering_spaces --value="$personal_filtering_spaces"
+fi
+if [ -z "$enable_relaybot" ]
+then
+  enable_relaybot="true"
+  ynh_app_setting_set --key=enable_relaybot --value="$enable_relaybot"
+fi
+if [ -z "$admin_only" ]
+then
+  admin_only="true"
+  ynh_app_setting_set --key=admin_only --value="$admin_only"
+fi
+if [ -z "$displayname" ]
+then
+  displayname="@@SHORT@@ bridge bot"
+  ynh_app_setting_set --key=displayname --value="$displayname"
+fi
+if [ -z "$listrelay" ]
+then
+    listrelay="*"
+    ynh_app_setting_set --key=listrelay --value="$listrelay"
+fi
+if [ -z "$listuser" ]
+then
+    listuser=$(ynh_app_setting_get --key=botusers)
+    ynh_app_setting_set --key=listuser --value="$listuser"
+    ynh_app_setting_delete --key=botusers
+fi
+if [ -z "$listadmin" ]
+then
+    listadmin=$(ynh_app_setting_get --key=botadmin)
+    ynh_app_setting_set --key=listadmin --value="$listadmin"
+    ynh_app_setting_delete --key=botadmin
+fi
+
+
+if [ -z "$async_media" ]
+then
+  async_media="false"
+  ynh_app_setting_set --key=async_media --value="$async_media"
+fi
+
+
+# The first versions of this package used the WhatsApp logo as bot avatar
+if [ -z "$avatar" ] || [ "$avatar" == "mxc://maunium.net/NeXNQarUbrlYBiPCpprYsRqr" ]
+then
+  avatar="@@AVATAR@@"
+  ynh_app_setting_set --key=avatar --value="$avatar"
+fi
+if [ -z "$ephemeral_events" ]
+then
+  ephemeral_events="true"
+  ynh_app_setting_set --key=ephemeral_events --value="$ephemeral_events"
+fi
+if [ -z "$username_template" ]
+then
+  username_template="@@PREFIX@@_{{.}}"
+  ynh_app_setting_set --key=username_template --value="$username_template"
+fi
+
+
+if [ -z "$delivery_receipts" ]
+then
+  delivery_receipts="false"
+  ynh_app_setting_set --key=delivery_receipts --value="$delivery_receipts"
+fi
+
+
+if [ -z "$encryption_default" ]
+then
+  encryption_default="false"
+  ynh_app_setting_set --key=encryption_default --value="$encryption_default"
+fi
+if [ -z "$encryption_require" ]
+then
+  encryption_require="false"
+  ynh_app_setting_set --key=encryption_require --value="$encryption_require"
+fi
+# Upgrade from <v0.11
+if [ -z "$pickle_key" ]
+then
+    pickle_key=$(ynh_string_random)
+    ynh_app_setting_set --key=pickle_key --value="$pickle_key"
+fi
+
+
+if [ -z "$print_level" ]
+then
+  print_level="info"
+  ynh_app_setting_set --key=print_level --value="$print_level"
+fi
+@@if backfill@@
+if [ -z "$thread_backfill_batch_count" ]
+then
+  thread_backfill_batch_count=@@BACKFILL_DEFAULT@@
+  ynh_app_setting_set --key=thread_backfill_batch_count --value="$thread_backfill_batch_count"
+fi
+@@endif@@
+
+
+#=================================================
+# DOWNLOAD, CHECK AND UNPACK SOURCE
+#=================================================
+
+ynh_script_progression "Upgrading source files..."
+
+# Download, check integrity, uncompress and patch the source from app.src
+ynh_setup_source --dest_dir="$install_dir"
+
+
+#=================================================
+# UPDATE A CONFIG FILE
+#=================================================
+ynh_script_progression "Updating configuration..."
+
+# reset permissions to be able to apply_permissions with app_setting values after upgrade
+listrelay_=$listrelay
+listuser_=$listuser
+listadmin_=$listadmin
+listrelay="*"
+listuser="@user:domain.tld"
+listadmin="@admin:domain.tld"
+
+@@NETOPTS_UPGRADE@@
+ensure_bridge_settings
+ynh_config_add --template="config.yaml" --destination="$install_dir/config.yaml"
+
+listrelay=$listrelay_
+listuser=$listuser_
+listadmin=$listadmin_
+
+# apply_permissions to have correct syntax in config file
+set__listuser
+set__listrelay
+set__listadmin
+
+configure_double_puppet
+
+#=================================================
+# REGISTER SYNAPSE APP-SERVICE
+#=================================================
+ynh_script_progression "Registering Synapse app-service"
+
+chmod u+x "$install_dir/@@BINARY@@" # Execute permissions for app user
+$install_dir/@@BINARY@@ -g -c $install_dir/config.yaml -r /etc/matrix-$synapse_instance/app-service/$app.yaml
+# We need to run @@BINARY@@ -g (registration) as root to be able to write in /etc/matrix-...
+secure_install_dir
+ynh_store_file_checksum "$install_dir/config.yaml"
+
+$synapse_install_dir/update_synapse_for_appservice.sh || ynh_die "Synapse can't restart with the appservice configuration"
+ynh_store_file_checksum "/etc/matrix-$synapse_instance/app-service/$app.yaml"
+
+#=================================================
+# SETUP SYSTEMD
+#=================================================
+ynh_script_progression "Upgrading systemd configuration..."
+
+# Create a dedicated systemd config
+ynh_config_add_systemd
+
+#=================================================
+# SETUP LOGROTATE
+#=================================================
+ynh_script_progression "Upgrading logrotate configuration..."
+
+# Use logrotate to manage application logfile(s)
+ynh_config_add_logrotate "/var/log/$app/$app.log" $app/$app
+
+#=================================================
+# INTEGRATE SERVICE IN YUNOHOST
+#=================================================
+ynh_script_progression "Integrating service in YunoHost..."
+
+yunohost service add $app --description="$app daemon for bridging @@DISPLAY@@ and Matrix messages" --log="/var/log/$app/$app.log"
+
+#=================================================
+# START SYSTEMD SERVICE
+#=================================================
+ynh_script_progression "Starting $app's systemd service..."
+
+# Start a systemd service
+ynh_systemctl --service="$app" --action="start"
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+
+ynh_script_progression "Upgrade of $app completed"

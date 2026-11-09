@@ -1,0 +1,172 @@
+# One entry per mautrix bridgev2 bridge packaged from the factory.
+# repo: github.com/mautrix/<repo>; binary: release asset prefix; prefix: Matrix ID prefix of remote users.
+
+
+# Optional keys:
+#   revision       package revision, the ~ynhN of the version (default 1; bump when the package changes, not the bridge)
+#   short          short network name used in sentences (default: display)
+#   name           app name in the catalog (default: "Mautrix <display>")
+#   network_config path of the network example config in the bridge repo (default: pkg/connector/example-config.yaml)
+#   backfill       default of the "import all older chats" option (-1 = yes, 0 = no); absent = no such option
+#   ghost_help / ghost_example   texts of the contact display name option
+#   description_en / description_fr   catalog description (default: "... bridge for <display>")
+#   network_set    fixed values in the network section, e.g. { "device_meta.os" = "Matrix (YunoHost)" }
+#   [[<id>.network_options]]     boolean options of the network section, kept as settings across upgrades
+# Files in bridges/<id>/ (README, doc/...) replace the generated ones.
+
+[meta]
+display = "Facebook Messenger"
+short = "Messenger"
+name = "Mautrix Meta (Messenger)"
+repo = "meta"
+binary = "mautrix-meta"
+version = "v0.2610.0"
+revision = 2
+bot = "facebookbot"
+prefix = "facebook"
+command_prefix = "!fb"
+port = 29319
+avatar = "mxc://maunium.net/ygtkteZsXnGJLJHRchUwYWak"
+alternative_to = "Messenger"
+backfill = -1
+ghost_help = "Go template. .DisplayName is the Messenger name and .Username the Facebook username. For example, add ' (FB)' at the end to recognise Messenger contacts at a glance."
+ghost_example = '{{or .DisplayName .Username "Unknown user"}} (FB)'
+
+[[meta.network_options]]
+key = "send_presence_on_typing"
+ask = "Mark you as online when you send typing notifications?"
+help = "Only has an effect for encrypted chats. Full presence bridging is not supported."
+
+[[meta.network_options]]
+key = "disable_view_once"
+ask = "Disable view-once messages entirely?"
+
+[instagram]
+display = "Instagram"
+repo = "meta"
+binary = "mautrix-instagram"
+version = "v0.2610.0"
+revision = 2
+bot = "instagrambot"
+prefix = "instagram"
+command_prefix = "!ig"
+port = 29330
+avatar = "mxc://maunium.net/JxjlbZUlCPULEeHZSwleUXQv"
+alternative_to = "Instagram"
+network_config = "pkg/igconnector/example-config.yaml"
+backfill = 0
+ghost_help = "Go template. .DisplayName is the Instagram name and .Username the Instagram username. For example, add ' (IG)' at the end to recognise Instagram contacts at a glance."
+ghost_example = '{{or .DisplayName .Username "Unknown user"}} (IG)'
+
+[[instagram.network_options]]
+key = "disable_typing"
+ask = "Disable typing notification bridging?"
+help = "Bridging typing notifications requires 2 extra connections to Instagram per user."
+
+[[instagram.network_options]]
+key = "disable_view_once"
+ask = "Disable view-once messages entirely?"
+
+[gmessages]
+display = "Google Messages"
+repo = "gmessages"
+binary = "mautrix-gmessages"
+version = "v0.2610.0"
+bot = "gmessagesbot"
+prefix = "gmessages"
+command_prefix = "!gm"
+port = 29336
+avatar = "mxc://maunium.net/yGOdcrJcwqARZqdzbfuxfhzb"
+alternative_to = "Google Messages"
+description_en = "Matrix / Synapse puppeting bridge for Google Messages (Android SMS/RCS)"
+description_fr = "Passerelle Matrix / Synapse pour Google Messages (SMS/RCS Android)"
+network_set = { "device_meta.os" = "Matrix (YunoHost)" }
+
+[[gmessages.network_options]]
+key = "aggressive_reconnect"
+ask = "Take back the active session when Google Messages is opened in a browser?"
+help = "If disabled, use the 'set-active' command to reactivate the bridge."
+
+[slack]
+display = "Slack"
+repo = "slack"
+binary = "mautrix-slack"
+version = "v0.2610.0"
+bot = "slackbot"
+prefix = "slack"
+command_prefix = "!slack"
+port = 29335
+avatar = "mxc://maunium.net/pVtzLmChZejGxLqmXtQjFxem"
+alternative_to = "Slack"
+login_en = "Send `login` to the bot and choose: your email (Slack sends a confirmation code), an auth token and cookie from the Slack web app, or a Slack app (bot and app tokens)."
+login_fr = "Envoyez `login` au robot et choisissez : votre e-mail (Slack envoie un code de confirmation), un jeton et un cookie de l'application web Slack, ou une application Slack (jetons bot et app)."
+
+[twitter]
+display = "X (Twitter)"
+repo = "twitter"
+binary = "mautrix-twitter"
+version = "v0.2609.0"
+bot = "twitterbot"
+prefix = "twitter"
+command_prefix = "!tw"
+port = 29327
+avatar = "mxc://maunium.net/HVHcnusJkQcpVcsVGZRELLCn"
+alternative_to = "X (Twitter)"
+login_en = "Send `login` to the bot: with your username and password (two-factor code if enabled), or with the cookies of a browser logged in to x.com. Only direct messages are bridged."
+login_fr = "Envoyez `login` au robot : avec votre identifiant et votre mot de passe (code de double authentification si activé), ou avec les cookies d'un navigateur connecté à x.com. Seuls les messages privés sont pontés."
+
+[linkedin]
+display = "LinkedIn"
+repo = "linkedin"
+binary = "mautrix-linkedin"
+version = "v0.2609.0"
+bot = "linkedinbot"
+prefix = "linkedin"
+command_prefix = "!linkedin"
+port = 29341
+avatar = "mxc://maunium.net/CqzBEHjrLsfdqixWZgNHMlRT"
+alternative_to = "LinkedIn"
+login_en = "Send `login` to the bot and paste the cookies of a browser logged in to linkedin.com (the bot explains how). Only messages are bridged."
+login_fr = "Envoyez `login` au robot et collez les cookies d'un navigateur connecté à linkedin.com (le robot explique comment). Seuls les messages sont pontés."
+
+[bluesky]
+display = "Bluesky"
+repo = "bluesky"
+binary = "mautrix-bluesky"
+version = "v0.2510.0"
+bot = "blueskybot"
+prefix = "bluesky"
+command_prefix = "!bsky"
+port = 29340
+avatar = "mxc://maunium.net/ezAjjDxhiJWGEohmhkpfeHYf"
+alternative_to = "Bluesky"
+login_en = "Send `login` to the bot, then your server (`bsky.social` by default), your handle or email and your password. An app password works if it has access to direct messages."
+login_fr = "Envoyez `login` au robot, puis votre serveur (`bsky.social` par défaut), votre pseudo ou e-mail et votre mot de passe. Un mot de passe d'application convient s'il a accès aux messages privés."
+
+[gvoice]
+display = "Google Voice"
+repo = "gvoice"
+binary = "mautrix-gvoice"
+version = "v0.2605.0"
+bot = "gvoicebot"
+prefix = "gvoice"
+command_prefix = "!gv"
+port = 29338
+avatar = "mxc://maunium.net/VOPtYGBzHLRfPTEzGgNMpeKo"
+alternative_to = "Google Voice"
+login_en = "Send `login` to the bot and paste the cookies of a browser logged in to voice.google.com (the bot explains how). Google Voice is mostly available in the United States."
+login_fr = "Envoyez `login` au robot et collez les cookies d'un navigateur connecté à voice.google.com (le robot explique comment). Google Voice est surtout disponible aux États-Unis."
+
+[zulip]
+display = "Zulip"
+repo = "zulip"
+binary = "mautrix-zulip"
+version = "v0.2511.0"
+bot = "zulipbot"
+prefix = "zulip"
+command_prefix = "!zulip"
+port = 29342
+avatar = "mxc://maunium.net/pKfjZaIjOREmSJoyYgnmonJZ"
+alternative_to = "Zulip"
+login_en = "Send `login` to the bot, then your Zulip server URL, your email and your API key (Zulip settings → Account & privacy → API key)."
+login_fr = "Envoyez `login` au robot, puis l'adresse de votre serveur Zulip, votre e-mail et votre clé d'API (réglages Zulip → Compte et confidentialité → Clé d'API)."

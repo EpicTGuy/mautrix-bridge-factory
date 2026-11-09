@@ -1,0 +1,120 @@
+#!/bin/bash
+source _common.sh
+source /usr/share/yunohost/helpers
+#REMOVEME? ynh_abort_if_errors
+
+#=================================================
+# SPECIFIC GETTERS FOR TOML SHORT KEY
+#=================================================
+
+get_config_permission() {
+  result=$(sed -n '/^    permissions:/,/^database:/p' "$install_dir/config.yaml" | grep -E -- ": \"?$role\"?$" | sed -r "s/: $role//" | tr -d '[:blank:]' | sed '/^#/d' | tr -d '\"' | tr -d "'" | tr '\n' ',')
+  echo $result
+}
+
+get__botname() {
+    botname=$(ynh_app_setting_get --key botname)
+    echo "${botname}"
+}
+
+get__listrelay() {
+  role="relay"
+  existingRelayUsers=$(get_config_permission)
+
+  cat <<EOF
+"$existingRelayUsers"
+EOF
+}
+
+get__listuser() {
+  role="user"
+  existingUsers=$(get_config_permission)
+
+  cat <<EOF
+"$existingUsers"
+EOF
+}
+
+get__listadmin() {
+  role="admin"
+  existingAdmins=$(get_config_permission)
+
+  cat <<EOF
+"$existingAdmins"
+EOF
+}
+
+#=================================================
+# SPECIFIC VALIDATORS FOR TOML SHORT KEYS
+#=================================================
+
+#=================================================
+# SPECIFIC SETTERS FOR TOML SHORT KEYS
+#=================================================
+
+set__botname() {
+    old_botname=$(ynh_app_setting_get --key botname)
+    if [ "$botname" == "$old_botname" ] # Check to avoid updating botname when it's not needed.
+    then
+      return
+    fi
+
+    ynh_app_setting_set --key=botname --value="$botname"
+    synapse_instance=$(ynh_app_setting_get --key synapse_instance)
+
+    sed -i "s/username:.*/username: $botname/" "$install_dir/config.yaml"
+    "$install_dir/@@BINARY@@" -g -c "$install_dir/config.yaml" -r "/etc/matrix-$synapse_instance/app-service/$app.yaml"
+    secure_install_dir
+    synapse_install_dir=$(ynh_app_setting_get --app "$synapse_instance" --key install_dir)
+    "$synapse_install_dir/update_synapse_for_appservice.sh" || ynh_die "Synapse can't restart with the appservice configuration"
+    ynh_store_file_checksum "/etc/matrix-$synapse_instance/app-service/$app.yaml"
+    ynh_store_file_checksum "$install_dir/config.yaml"
+}
+
+@@if backfill@@
+set__thread_backfill_batch_count() {
+    ynh_app_setting_set --key=thread_backfill_batch_count --value="$thread_backfill_batch_count"
+    ynh_write_var_in_file --file="$install_dir/config.yaml" --key=batch_count --value="$thread_backfill_batch_count" --after="thread_backfill:"
+    secure_install_dir
+    ynh_store_file_checksum "$install_dir/config.yaml"
+    ynh_systemctl --service="$app" --action="restart"
+}
+
+@@endif@@
+@@if ghost@@
+set__ghost_displayname_template() {
+    ynh_app_setting_set --key=ghost_displayname_template --value="$ghost_displayname_template"
+    write_yaml_string network displayname_template "$ghost_displayname_template"
+    secure_install_dir
+    ynh_store_file_checksum "$install_dir/config.yaml"
+    ynh_systemctl --service="$app" --action="restart"
+}
+
+@@endif@@
+set__displayname() {
+    ynh_app_setting_set --key=displayname --value="$displayname"
+    write_yaml_string appservice displayname "$displayname"
+    secure_install_dir
+    ynh_store_file_checksum "$install_dir/config.yaml"
+    ynh_systemctl --service="$app" --action="restart"
+}
+
+set__avatar() {
+    [[ -z "$avatar" || "$avatar" == "remove" || "$avatar" =~ ^mxc://[A-Za-z0-9.:-]+/[A-Za-z0-9_-]+$ ]] \
+        || ynh_die "The avatar must be an mxc:// URI (mxc://server/id), 'remove' or empty."
+    ynh_app_setting_set --key=avatar --value="$avatar"
+    write_yaml_string appservice avatar "$avatar"
+    secure_install_dir
+    ynh_store_file_checksum "$install_dir/config.yaml"
+    ynh_systemctl --service="$app" --action="restart"
+}
+
+set__backfill_max_initial_messages() {
+    ynh_app_setting_set --key=backfill_max_initial_messages --value="$backfill_max_initial_messages"
+    ynh_write_var_in_file --file="$install_dir/config.yaml" --key=max_initial_messages --value="$backfill_max_initial_messages" --after="backfill:"
+    secure_install_dir
+    ynh_store_file_checksum "$install_dir/config.yaml"
+    ynh_systemctl --service="$app" --action="restart"
+}
+
+ynh_app_config_run $1
